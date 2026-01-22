@@ -13,11 +13,13 @@
         <link type="text/css" rel="stylesheet" href="../lib/bootstrap/bootstrap.min.css">
         <!-- Link to bootstrap formhelpers -->
         <link type="text/css" rel="stylesheet" href="../lib/bootstrap/bootstrap-formhelpers.css">
-        <!-- Load local resources -->   
+        <!-- Load local resources -->
         <script src="utility.js"></script>
         <script src="reader.js"></script>
-        <script src="engine.js"></script>      
+        <script src="engine.js"></script>
         <script src="facts.js"></script>
+        <!-- PDF.js library for reading PDF files -->
+        <script src="../lib/pdfjs/pdf.min.js"></script>
         <link type="text/css" rel="stylesheet" href="css/style.css" id="css-style">
     </head>
     <body>
@@ -49,7 +51,9 @@
                                 <li><a id="menuHistory2">Load history #2</a></li>
                                 <li id="menuHistoryDivider" class="divider"></li>
                                 <li><a id="menuLoadClipboard">Load clipboard content (C)</a></li>
+                                <li><a id="menuLoadFile">Load file (F)</a></li>
                             </ul>
+                            <input type="file" id="fileInput" accept=".txt,.pdf,.md,.html,.htm" style="display: none;">
                             <div id="progress" class="progress progress-striped">
                                 <div id="remainingTime" class="remainingTime"></div>
                                 <div id="progress-indicator" class="progress-bar progress-bar-info" style="width: 0%">
@@ -162,7 +166,8 @@
                                     <div class="input-group">
                                         <label for="color">Color Scheme</label>
                                         <select id="color" name="colorScheme" class="form-control" form="settings">
-                                            <option value="16">Modern Blue (Default)</option>
+                                            <option value="-1">Auto (System)</option>
+                                            <option value="16">Modern Blue</option>
                                             <option value="1">Black</option>
                                             <option value="3">Blue</option>
                                             <option value="11">Charcoal</option>
@@ -348,6 +353,7 @@
                                 - Large step back/forward | <b>K / L</b><br>
                                 - Reset to start | <b>R</b><br>
                                 - Load clipboard contents | <b>C</b><br>
+                                - Load file | <b>F</b><br>
                                 - Load current selection | <b>V</b><br>
                                 - Close reader window | <b>Q</b><br>
                             </ol>

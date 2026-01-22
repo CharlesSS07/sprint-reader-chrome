@@ -58,7 +58,11 @@ var colorGithubIcon;
 //		1 = history 1
 //		2 = history 2
 //		9 = clipboard
+//		10 = file content
 var selectedTextID = 0;
+
+// Temporary storage for file content loaded via "Load file" option
+var fileContent = "";
 
 // The slide tooltip which is created at init
 var slideTooltip;
@@ -134,6 +138,15 @@ async function loadReader() {
         setFontProperties();
         setDisplayProperties();
         setColorScheme(colorScheme);
+
+        // Listen for OS theme changes (only applies when Auto is selected)
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+                if (colorScheme === -1 || colorScheme === "-1") {
+                    setColorScheme(colorScheme);
+                }
+            });
+        }
 
         // Set the hyphenator (if used)
         setHyphenator();
@@ -255,6 +268,7 @@ function setEventListeners() {
         $(document).bind("keypress", "q", bindQuit);
         $(document).bind("keypress", "r", bindReset);
         $(document).bind("keypress", "c", bindClipboardLoad);
+        $(document).bind("keypress", "f", bindFileLoad);
         $(document).bind("keypress", "v", bindSelectionLoad);
 
         // Set all the event listeners for the extension
@@ -330,6 +344,20 @@ function setEventListeners() {
             },
             false,
         );
+
+        // play menu - load file
+        var divLoadFile = document.getElementById("menuLoadFile");
+        divLoadFile.addEventListener(
+            "click",
+            function () {
+                document.getElementById("fileInput").click();
+            },
+            false,
+        );
+
+        // file input change handler
+        var fileInput = document.getElementById("fileInput");
+        fileInput.addEventListener("change", handleFileSelect, false);
 
         // ----------------------------------
         // Add event listener to the progress bar
@@ -446,8 +474,8 @@ function getSettingsDefault() {
     autoStart = false;
     autoStartSeconds = 2;
     chunkSize = 1;
-    colorScheme = 16;
-    colorSchemeName = "modern-blue";
+    colorScheme = -1;
+    colorSchemeName = "auto";
     font = "Arial";
     fontSize = 110;
     showRemainingTime = true;
@@ -568,6 +596,11 @@ async function getSelectedTextHistoryFromLocal(historyid) {
             // Clipboard data
             selectedTextID = 9;
             text = await navigator.clipboard.readText();
+            break;
+        case 10:
+            // File content
+            selectedTextID = 10;
+            text = fileContent;
             break;
     }
 
@@ -902,8 +935,22 @@ function setColourPickerDisplay(hex) {
     if (highlightOptimalLetter) $("#highlightOptimalLetter").prop("checked", true);
 }
 
+function getSystemThemeScheme() {
+    // Detect OS/browser theme preference
+    // Returns 6 (High Contrast) for dark mode, 16 (Modern Blue) for light mode
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 6; // High Contrast (dark theme)
+    }
+    return 16; // Modern Blue (light theme)
+}
+
 function setColorScheme(scheme) {
     //console.log("[Sprint Reader] Colour scheme (set): " + scheme)
+    // Handle auto theme detection
+    if (scheme === -1 || scheme === "-1") {
+        scheme = getSystemThemeScheme();
+        colorSchemeName = "auto";
+    }
     switch (scheme) {
         case 0:
             // WHITE
@@ -1567,6 +1614,74 @@ function bindClipboardLoad(k) {
     if (String.fromCharCode(k.keyCode) == "c") {
         loadSelectedTextHistory(9);
     }
+}
+
+function bindFileLoad(k) {
+    if (String.fromCharCode(k.keyCode) == "f") {
+        document.getElementById("fileInput").click();
+    }
+}
+
+async function handleFileSelect(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+
+    var text = "";
+    var fileName = file.name.toLowerCase();
+
+    try {
+        if (fileName.endsWith(".pdf")) {
+            text = await extractTextFromPDF(file);
+        } else {
+            // Handle text files (.txt, .md, .html, etc.)
+            text = await file.text();
+            // Strip HTML tags if it's an HTML file
+            if (fileName.endsWith(".html") || fileName.endsWith(".htm")) {
+                var tempDiv = document.createElement("div");
+                tempDiv.innerHTML = text;
+                text = tempDiv.textContent || tempDiv.innerText || "";
+            }
+        }
+
+        if (text && text.trim().length > 0) {
+            loadTextFromFile(text);
+        } else {
+            alert("Could not extract text from file. The file may be empty or contain only images.");
+        }
+    } catch (error) {
+        console.error("[Sprint Reader] Error reading file:", error);
+        alert("Error reading file: " + error.message);
+    }
+
+    // Reset the file input so the same file can be selected again
+    event.target.value = "";
+}
+
+async function extractTextFromPDF(file) {
+    // Set up PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "../lib/pdfjs/pdf.worker.min.js";
+
+    var arrayBuffer = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    var textContent = [];
+
+    for (var i = 1; i <= pdf.numPages; i++) {
+        var page = await pdf.getPage(i);
+        var content = await page.getTextContent();
+        var pageText = content.items.map(function(item) {
+            return item.str;
+        }).join(" ");
+        textContent.push(pageText);
+    }
+
+    return textContent.join("\n\n");
+}
+
+function loadTextFromFile(text) {
+    // Store the file content in the global variable
+    fileContent = text;
+    // Use the existing history loading mechanism with ID 10 for file content
+    loadSelectedTextHistory(10);
 }
 
 // Sets up the slide tooltip
